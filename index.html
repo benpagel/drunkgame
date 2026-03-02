@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Party Roulette Mobile</title>
+    <style>
+        :root {
+            --primary: #ff4757;
+            --secondary: #2ed573;
+            --accent: #eccc68;
+            --dark: #1a1a1a;
+            --card: #2c2c2c;
+            --light: #f1f2f6;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--dark);
+            color: var(--light);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Header & Musik-Button */
+        header {
+            width: 100%;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .music-btn {
+            padding: 8px 15px;
+            background: var(--card);
+            border: 1px solid #444;
+            color: white;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        /* Haupt-Container */
+        .main-container {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        /* Roulette Bereich */
+        .wheel-section {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        #wheel-container {
+            position: relative;
+            width: 85vw; /* Flexibel für Handys */
+            max-width: 350px;
+            height: 85vw;
+            max-height: 350px;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 50%;
+            border: 8px solid #333;
+            transition: transform 4s cubic-bezier(0.15, 0, 0.15, 1);
+        }
+
+        #pointer {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid var(--primary);
+            z-index: 10;
+        }
+
+        /* Ergebnis Box */
+        #result-display {
+            width: 100%;
+            background: var(--card);
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+            min-height: 100px;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+            border-bottom: 4px solid var(--primary);
+        }
+
+        .winner-name { font-size: 1.8rem; color: var(--accent); font-weight: bold; display: block; }
+        .challenge-text { font-style: italic; color: #a29bfe; margin-top: 8px; font-size: 0.95rem; }
+
+        /* Eingabe & Liste */
+        .player-section {
+            width: 100%;
+            background: var(--card);
+            border-radius: 15px;
+            padding: 15px;
+            box-sizing: border-box;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        input {
+            flex: 1;
+            padding: 12px;
+            border-radius: 10px;
+            border: none;
+            background: #444;
+            color: white;
+            font-size: 16px; /* Verhindert Auto-Zoom auf iPhones */
+        }
+
+        .add-btn {
+            background: var(--secondary);
+            color: white;
+            border: none;
+            padding: 0 20px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .player-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .player-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #3d3d3d;
+            margin-bottom: 5px;
+            border-radius: 8px;
+        }
+
+        /* Dreh-Button (Fixiert am unteren Rand oder unter dem Rad) */
+        #spinBtn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(45deg, var(--secondary), #26af5f);
+            border: none;
+            border-radius: 15px;
+            color: white;
+            font-size: 1.4rem;
+            font-weight: bold;
+            margin: 20px 0;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        #spinBtn:disabled { opacity: 0.5; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2 style="margin:0; color:var(--primary); font-size: 1.2rem;">🍻 Trink-Roulette</h2>
+        <button class="music-btn" id="musicBtn" onclick="toggleMusic()">🎵 Ton: AUS</button>
+    </header>
+
+    <div class="main-container">
+        
+        <div id="result-display">
+            <div id="resultContent">Füge Spieler hinzu und los!</div>
+        </div>
+
+        <div class="wheel-section">
+            <div id="pointer"></div>
+            <div id="wheel-container">
+                <canvas id="canvas" width="400" height="400"></canvas>
+            </div>
+        </div>
+
+        <button id="spinBtn" onclick="spin()">JETZT DREHEN!</button>
+
+        <div class="player-section">
+            <div class="input-group">
+                <input type="text" id="nameInput" placeholder="Name..." onkeypress="if(event.key==='Enter') addPlayer()">
+                <button class="add-btn" onclick="addPlayer()">+</button>
+            </div>
+            <div id="playerListContainer" class="player-list"></div>
+        </div>
+    </div>
+
+<script>
+    let players = [];
+    let currentRotation = 0;
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    const challenges = [
+        "Trinke ohne Hände!", "Trink-Buddy wählen!", "Auf einem Bein trinken!", 
+        "Alle Brillenträger trinken!", "Männer trinken!", "Frauen trinken!", 
+        "Witz erzählen oder +2!", "5 Liegestützen!", "Reime auf 'Bier'!", 
+        "Nachbar verteilt 2!", "Nicht 'Ja/Nein' sagen!", "Auf Ex!", "Plätze tauschen!"
+    ];
+
+    const bgMusic = new Audio('https://www.bensound.com/bensound-music/bensound-house.mp3');
+    const spinSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2005/2005-preview.mp3');
+    const winSound = new Audio('https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3');
+    bgMusic.loop = true;
+
+    function toggleMusic() {
+        const btn = document.getElementById('musicBtn');
+        if (bgMusic.paused) {
+            bgMusic.play();
+            btn.innerText = "🎵 Ton: AN";
+            btn.style.background = "var(--secondary)";
+        } else {
+            bgMusic.pause();
+            btn.innerText = "🎵 Ton: AUS";
+            btn.style.background = "var(--card)";
+        }
+    }
+
+    function addPlayer() {
+        const input = document.getElementById('nameInput');
+        if (input.value.trim()) {
+            players.push({ id: Date.now(), name: input.value.trim(), sips: 0 });
+            input.value = '';
+            render();
+        }
+    }
+
+    function removePlayer(id) {
+        players = players.filter(p => p.id !== id);
+        render();
+    }
+
+    function render() {
+        const container = document.getElementById('playerListContainer');
+        const sorted = [...players].sort((a,b) => b.sips - a.sips);
+        container.innerHTML = sorted.map(p => `
+            <div class="player-item">
+                <span><b>${p.name}</b> (${p.sips})</span>
+                <button onclick="removePlayer(${p.id})" style="background:none; border:none; color:var(--primary); font-size:1.2rem;">✕</button>
+            </div>
+        `).join('');
+        drawWheel();
+    }
+
+    function drawWheel() {
+        ctx.clearRect(0,0,400,400);
+        if(!players.length) return;
+        const arc = (2*Math.PI)/players.length;
+        players.forEach((p, i) => {
+            ctx.beginPath();
+            ctx.fillStyle = `hsl(${(i*360)/players.length}, 60%, 50%)`;
+            ctx.moveTo(200,200); ctx.arc(200,200,200, i*arc, (i+1)*arc); ctx.fill();
+            ctx.save(); ctx.translate(200,200); ctx.rotate(i*arc + arc/2);
+            ctx.textAlign="right"; ctx.fillStyle="white"; ctx.font="bold 18px Arial";
+            ctx.fillText(p.name.substring(0,10), 180, 7); ctx.restore();
+        });
+    }
+
+    function spin() {
+        if(players.length < 2) return alert("Min. 2 Spieler!");
+        const btn = document.getElementById('spinBtn');
+        btn.disabled = true;
+        if(!bgMusic.paused) spinSound.play();
+
+        const extra = Math.floor(Math.random() * 360) + 1800;
+        currentRotation += extra;
+        canvas.style.transform = `rotate(${currentRotation}deg)`;
+
+        setTimeout(() => {
+            btn.disabled = false;
+            if(!bgMusic.paused) winSound.play();
+            const deg = currentRotation % 360;
+            const idx = Math.floor(((360 - deg) + 270) % 360 / (360/players.length));
+            const winner = players[idx % players.length];
+            const sips = Math.random() < 0.7 ? Math.floor(Math.random()*3)+1 : Math.floor(Math.random()*6)+4;
+            winner.sips += sips;
+            const chal = challenges[Math.floor(Math.random()*challenges.length)];
+
+            document.getElementById('resultContent').innerHTML = `
+                <span class="winner-name">${winner.name}</span>
+                <b>${sips} Schlucke</b>
+                <div class="challenge-text">"${chal}"</div>
+            `;
+            render();
+        }, 4000);
+    }
+    render();
+</script>
+</body>
+</html>
